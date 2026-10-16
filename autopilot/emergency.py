@@ -23,8 +23,27 @@ import shutil
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from recorder import record
 from memory import remember
+from procutil import is_script_running
 
 CHECK_INTERVAL = 30  # 30秒一轮
+
+# supervisor 的 systemd 服务名（装了服务时用 systemctl 重启，避免和 Restart=always 打架）
+SUPERVISOR_UNIT = "autopilot-supervisor"
+
+
+def _has_supervisor_unit():
+    return os.path.exists(
+        f"/etc/systemd/system/{SUPERVISOR_UNIT}.service")
+
+
+def _systemctl_restart_supervisor():
+    try:
+        r = subprocess.run(
+            ["sudo", "systemctl", "restart", SUPERVISOR_UNIT],
+            capture_output=True, text=True, timeout=30)
+        return r.returncode == 0
+    except Exception:
+        return False
 
 
 def _run(cmd, timeout=10):
@@ -64,7 +83,8 @@ def check_net_dead():
 
 
 def check_supervisor_dead():
-    alive = bool(_run("pgrep -f 'supervisor.py' | head -1"))
+    # 精确检测：扫 /proc，不用 pgrep -f（pgrep 会匹配到执行它的 shell 而误报存活）
+    alive = is_script_running("supervisor.py")
     return not alive, "supervisor 进程不存在"
 
 
@@ -119,11 +139,15 @@ def emergency_net():
 def emergency_supervisor():
     record("emergency", "action", "P0: supervisor死了，重启",
            level="critical")
-    _run("cd ~/workspace/autopilot && "
-         "nohup python3 supervisor.py > logs/supervisor.log 2>&1 "
-         "< /dev/null & disown")
+    if _has_supervisor_unit():
+        # systemd 接管时：走 systemctl restart（nohup 会和 Restart=always 产生双实例）
+        _systemctl_restart_supervisor()
+    else:
+        _run("cd ~/workspace/autopilot && "
+             "nohup python3 supervisor.py > logs/supervisor.log 2>&1 "
+             "< /dev/null & disown")
     time.sleep(3)
-    alive = bool(_run("pgrep -f 'supervisor.py' | head -1"))
+    alive = is_script_running("supervisor.py")
     record("emergency", "action",
            f"supervisor重启{'成功' if alive else '失败'}",
            level="critical" if not alive else "warning")
