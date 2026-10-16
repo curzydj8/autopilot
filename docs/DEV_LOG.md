@@ -192,3 +192,28 @@ supervisor 后台运行，每5分钟一轮
 2. 启动 brain
 3. Waydroid 镜像下载完成 → 装 Muse APK
 4. task_runner 联调
+
+---
+
+## 阶段六：本地记忆模块 (08:30-08:35)
+
+### 需求
+用户要求"记忆模块，把你不能存储的记忆放到本地，这样就不用失忆了"。
+
+### 设计
+三类记忆（仿人类）：
+- **episodic（情景）**："2026-10-16 装了XFCE" —— 发生过的事
+- **semantic（语义）**："uinput需要input组" —— 事实知识
+- **procedural（程序）**："磁盘满→apt clean" —— 怎么做
+
+记忆机制：
+- 重要度 0-1，强化时提升
+- 时间衰减：重要的衰减慢（0.99），不重要的快（0.95）
+- 30天未访问且重要度<0.1 自动删除
+
+### 交付
+- `memory.py`：SQLite持久化，remember/recall/forget/decay
+- `consolidate.py`：recorder事件→长期记忆（仿睡眠巩固）
+- 预置7条核心记忆，整合后12条
+- supervisor每12轮自动整合
+- 架构 v1.3（13模块）
