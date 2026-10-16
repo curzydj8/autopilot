@@ -1,0 +1,1 @@
+{"current_task_index":0,"current_wave":1,"waves":[{"name":"第一波：环境验证","tasks":[{"content":"你好，请确认你能正常收到这条消息，并告诉我当前时间","id":"w1-t1","predicted_minutes":1,"status":"pending"},{"content":"用一句话介绍你自己","id":"w1-t2","predicted_minutes":1,"status":"pending"}],"wave_id":1}]}
