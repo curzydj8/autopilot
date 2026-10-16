@@ -1,0 +1,279 @@
+{
+  "architecture": {
+    "version": "1.12",
+    "upgradable": true
+  },
+  "updated": "2026-10-16 10:52",
+  "machine": {
+    "hostname": "z5095738",
+    "network": {
+      "lan_ip": "192.168.1.108",
+      "tailscale_ip": "100.114.210.86"
+    },
+    "services": {
+      "v2raya": {
+        "status": "active",
+        "port": 2017
+      },
+      "xrdp": {
+        "status": "active",
+        "port": 3389
+      },
+      "waydroid-container": {
+        "status": "active"
+      }
+    }
+  },
+  "hardware": {
+    "cpu": "Xeon E5-2680 v4",
+    "threads": 20,
+    "memory": "7.2G",
+    "disk": "59G",
+    "gpu": "无独显"
+  },
+  "os": {
+    "distro": "Ubuntu 26.04 LTS",
+    "desktop": "XFCE"
+  },
+  "applications": {
+    "desktop": [
+      {
+        "name": "Firefox",
+        "path": "/usr/bin/firefox",
+        "category": "browser"
+      },
+      {
+        "name": "VSCode",
+        "path": "/usr/bin/code",
+        "category": "editor"
+      },
+      {
+        "name": "Edge",
+        "path": "/usr/bin/microsoft-edge",
+        "category": "browser"
+      },
+      {
+        "name": "WeChat",
+        "path": "com.tencent.wechatappex",
+        "category": "chat"
+      },
+      {
+        "name": "RetroArch",
+        "path": "com.libretro.RetroArch",
+        "category": "game"
+      }
+    ],
+    "waydroid": {
+      "status": "downloading",
+      "muse_apk": {
+        "status": "missing"
+      }
+    }
+  },
+  "intelligence_layer": {
+    "supervisor_interval_sec": 300,
+    "modules": {
+      "supervisor": {
+        "desc": "总调度",
+        "status": "running",
+        "depends": [
+          "all"
+        ]
+      },
+      "monitor": {
+        "desc": "系统监控",
+        "status": "running",
+        "depends": []
+      },
+      "healer": {
+        "desc": "自愈",
+        "status": "running",
+        "depends": [
+          "monitor"
+        ]
+      },
+      "local_net": {
+        "desc": "网络守护",
+        "status": "running",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "recorder": {
+        "desc": "事件记录",
+        "status": "running",
+        "depends": []
+      },
+      "learner": {
+        "desc": "技能库",
+        "status": "running",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "scenarios": {
+        "desc": "复杂场景",
+        "status": "running",
+        "depends": [
+          "monitor",
+          "recorder"
+        ]
+      },
+      "evolve": {
+        "desc": "自我进化引擎",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "learner"
+        ]
+      },
+      "vision": {
+        "desc": "眼睛(截屏/找图/OCR)",
+        "status": "running",
+        "depends": []
+      },
+      "brain": {
+        "desc": "认知主循环",
+        "status": "standby",
+        "depends": []
+      },
+      "human_input": {
+        "desc": "人类模拟输入",
+        "status": "ready",
+        "depends": []
+      },
+      "handler_disk_1792109310": {
+        "desc": "自进化磁盘清理",
+        "status": "ready",
+        "depends": [],
+        "path": "evolved/handler_disk_1792109310.py"
+      },
+      "memory": {
+        "desc": "本地记忆(SQLite三类)",
+        "status": "running",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "consolidate": {
+        "desc": "记忆整合",
+        "status": "running",
+        "depends": [
+          "memory",
+          "recorder"
+        ]
+      },
+      "emergency": {
+        "desc": "紧急处理(P0/30秒)",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "memory"
+        ]
+      },
+      "upgrader": {
+        "desc": "模块热升级",
+        "status": "ready",
+        "depends": []
+      },
+      "optimizer": {
+        "desc": "系统优化器",
+        "status": "running",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "master": {
+        "desc": "主控中心",
+        "status": "ready",
+        "depends": []
+      },
+      "scheduler": {
+        "desc": "优先级调度",
+        "status": "ready",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "verify": {
+        "desc": "验证修复引擎",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "memory",
+          "learner"
+        ]
+      },
+      "llm": {
+        "desc": "本地LLM推理(Ollama)",
+        "status": "installing",
+        "depends": [
+          "recorder",
+          "memory"
+        ]
+      },
+      "safety": {
+        "desc": "安全沙箱(最高权限上下文)",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "memory"
+        ]
+      },
+      "evolve_llm": {
+        "desc": "LLM进化引擎(OpenEvolve模式)",
+        "status": "waiting_model",
+        "depends": [
+          "llm",
+          "safety",
+          "recorder",
+          "memory"
+        ]
+      },
+      "taskstate": {
+        "desc": "任务状态机+checkpoint (pending/running/done/failed/retry/dead_letter, SQLite)",
+        "status": "ready",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "procutil": {
+        "desc": "精确进程检测 (/proc 扫描，替代 pgrep -f，防自匹配误报)",
+        "status": "running",
+        "depends": []
+      }
+    }
+  },
+  "tasks": {
+    "queue_file": "~/workspace/task-queue/tasks.json",
+    "runner": "task-queue/task_runner.py"
+  },
+  "evolution": {
+    "engine": "evolve.py",
+    "output_dir": "evolved/",
+    "sandbox": "sandbox/",
+    "auto_evolve_interval_cycles": 6
+  },
+  "gaps": [
+    {
+      "item": "Waydroid未就绪",
+      "impact": "无安卓环境",
+      "plan": "镜像下载中"
+    },
+    {
+      "item": "Muse APK缺失",
+      "impact": "无法在安卓里跑Muse",
+      "plan": "等用户提供"
+    },
+    {
+      "item": "vision缺mss",
+      "impact": "看不见屏幕",
+      "plan": "装python3-mss"
+    },
+    {
+      "item": "brain未启动",
+      "impact": "无自主认知循环",
+      "plan": "vision就绪后启动"
+    }
+  ]
+}
