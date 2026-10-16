@@ -331,3 +331,26 @@ Gemini 架构指出安全层是"最关键模块"。我们之前 evolve.py 自动
 - 已安装，服务运行中
 - qwen2.5:1.5b 下载中（441KB/s，约37分钟）
 - `llm.py` 已写好（规划/决策/反思接口），等模型就绪
+
+---
+
+## 阶段十二：自己装上眼睛 (09:10-09:15)
+
+### 需求
+用户问："能不能自己想办法给自己装上眼睛"
+
+### 排查过程（系统自己想办法）
+1. 试 scrot + DISPLAY=:0 → 失败（无认证）
+2. 试 grim（Wayland原生） → 失败（compositor不支持wlr-screencopy）
+3. 查进程 → 发现 Xwayland，认证文件在 /run/user/1000/xauth_euNHCA
+4. scrot + 正确 XAUTHORITY → **成功**（1280x800）
+
+### 解决
+- vision.py 新增 `_get_xauth()`：自动从 Xwayland 命令行找 -auth 参数
+- screenshot() 优先 mss，备选 scrot+Xwayland自动认证
+- 验证：`vision.py --shot` 返回有效PNG（1280x800）
+- 架构 v1.10，vision: degraded → running
+
+### 意义
+这是系统第一次真正的"自我解决问题"：
+发现问题 → 尝试方案A → 失败 → 分析原因 → 尝试方案B → 成功 → 固化到代码
