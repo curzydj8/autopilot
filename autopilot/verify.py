@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from recorder import record
 from memory import remember, recall
 from learner import learn_new_skill, find_skill
+from procutil import is_script_running
 
 MODULE_DIR = os.path.expanduser("~/workspace/autopilot")
 
@@ -43,14 +44,13 @@ def _run(cmd, timeout=30):
 # 每个模块的自测：怎么测算"正常"
 TEST_CASES = {
     "supervisor": {
-        "test": lambda: _run(
-            "pgrep -f 'supervisor.py' | head -1")[0],
+        # 精确检测：直接扫 /proc，不用 pgrep -f（pgrep 会匹配到执行它的 shell）
+        "test": lambda: is_script_running("supervisor.py"),
         "expect": True,
         "desc": "进程存活",
     },
     "emergency": {
-        "test": lambda: _run(
-            "pgrep -f 'emergency.py' | head -1")[0],
+        "test": lambda: is_script_running("emergency.py"),
         "expect": True,
         "desc": "进程存活",
     },
@@ -79,6 +79,15 @@ TEST_CASES = {
 
 def _test_import(module, attr):
     try:
+        m = __import__(module)
+        return hasattr(m, attr)
+    except Exception:
+        pass
+    # 输入模拟模块（human_input 等）放在 ~/workspace/（autopilot 的上一级），补一次查找
+    try:
+        parent = os.path.dirname(MODULE_DIR)
+        if parent not in sys.path:
+            sys.path.insert(0, parent)
         m = __import__(module)
         return hasattr(m, attr)
     except Exception:
@@ -167,8 +176,12 @@ def apply_fix(name, fix):
     return False, "不支持自动修复，需人工"
 
 
-def verify_fix(name):
-    """确认修复结果：重测"""
+def verify_fix(name, fix):
+    """确认修复结果：重测
+
+    fix 必须由调用方传入真实修复方案字符串（之前版本里
+    `fix if (fix := True) else ""` 把布尔值 True 写进了技能库）。
+    """
     time.sleep(3)
     passed, desc = run_test(name)
     if passed:
@@ -176,9 +189,9 @@ def verify_fix(name):
         remember("episodic", f"verify-fix-{name}-{int(time.time())}",
                  f"验证修复 {name} 成功: {desc}",
                  importance=0.7, tags=["verify", "fix"])
-        # 记入技能库
-        learn_new_skill(f"{name} 测试失败", fix if (
-            fix := True) else "", f"验证引擎自动修复")
+        # 记入技能库：solution 必须是真实方案字符串
+        learn_new_skill(f"{name} 测试失败", str(fix),
+                        "验证引擎自动修复")
     else:
         record("verify", "confirm", f"❌ {name} 修复无效",
                level="error")
@@ -208,7 +221,7 @@ def verify_cycle():
         ok, out = apply_fix(name, fix)
         # 确认
         if ok:
-            confirmed = verify_fix(name)
+            confirmed = verify_fix(name, fix)
             repairs.append({"module": name, "fix": fix,
                             "confirmed": confirmed})
         else:
