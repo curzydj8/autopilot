@@ -1,0 +1,40 @@
+# autopilot-emergency.service —— P0 紧急处理（30 秒一轮，独立 fast path）
+#
+# 受限设计同 autopilot-supervisor.service，另注意：
+# - emergency.py 需要免密 sudo（apt clean / journal vacuum / drop_caches），
+#   因此不能开 NoNewPrivileges / RestrictSUIDSGID；以用户级运行 + 系统目录
+#   只读 + 资源上限作为补偿。
+# - emergency 发现 supervisor 死亡时走 `systemctl restart autopilot-supervisor`，
+#   不再用 nohup（避免和 Restart=always 产生双实例）。
+
+[Unit]
+Description=Autopilot Emergency - P0 fast path handler (30s loop)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zhangdawei
+Group=zhangdawei
+WorkingDirectory=/home/zhangdawei/workspace/autopilot
+ExecStart=/usr/bin/python3 /home/zhangdawei/workspace/autopilot/emergency.py
+Restart=always
+RestartSec=10
+
+# --- 沙箱限制 ---
+ProtectSystem=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+# --- 资源上限 ---
+MemoryMax=512M
+CPUQuota=30%
+
+# 日志走 journal：journalctl -u autopilot-emergency -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
