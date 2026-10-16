@@ -1,9 +1,9 @@
 {
   "architecture": {
-    "version": "1.0",
+    "version": "1.12",
     "upgradable": true
   },
-  "updated": "2026-10-16T08:12:00",
+  "updated": "2026-10-16 10:52",
   "machine": {
     "hostname": "z5095738",
     "network": {
@@ -128,8 +128,8 @@
         ]
       },
       "vision": {
-        "desc": "截屏/找图/OCR",
-        "status": "degraded",
+        "desc": "眼睛(截屏/找图/OCR)",
+        "status": "running",
         "depends": []
       },
       "brain": {
@@ -140,6 +140,106 @@
       "human_input": {
         "desc": "人类模拟输入",
         "status": "ready",
+        "depends": []
+      },
+      "handler_disk_1792109310": {
+        "desc": "自进化磁盘清理",
+        "status": "ready",
+        "depends": [],
+        "path": "evolved/handler_disk_1792109310.py"
+      },
+      "memory": {
+        "desc": "本地记忆(SQLite三类)",
+        "status": "running",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "consolidate": {
+        "desc": "记忆整合",
+        "status": "running",
+        "depends": [
+          "memory",
+          "recorder"
+        ]
+      },
+      "emergency": {
+        "desc": "紧急处理(P0/30秒)",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "memory"
+        ]
+      },
+      "upgrader": {
+        "desc": "模块热升级",
+        "status": "ready",
+        "depends": []
+      },
+      "optimizer": {
+        "desc": "系统优化器",
+        "status": "running",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "master": {
+        "desc": "主控中心",
+        "status": "ready",
+        "depends": []
+      },
+      "scheduler": {
+        "desc": "优先级调度",
+        "status": "ready",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "verify": {
+        "desc": "验证修复引擎",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "memory",
+          "learner"
+        ]
+      },
+      "llm": {
+        "desc": "本地LLM推理(Ollama)",
+        "status": "installing",
+        "depends": [
+          "recorder",
+          "memory"
+        ]
+      },
+      "safety": {
+        "desc": "安全沙箱(最高权限上下文)",
+        "status": "running",
+        "depends": [
+          "recorder",
+          "memory"
+        ]
+      },
+      "evolve_llm": {
+        "desc": "LLM进化引擎(OpenEvolve模式)",
+        "status": "waiting_model",
+        "depends": [
+          "llm",
+          "safety",
+          "recorder",
+          "memory"
+        ]
+      },
+      "taskstate": {
+        "desc": "任务状态机+checkpoint (pending/running/done/failed/retry/dead_letter, SQLite)",
+        "status": "ready",
+        "depends": [
+          "recorder"
+        ]
+      },
+      "procutil": {
+        "desc": "精确进程检测 (/proc 扫描，替代 pgrep -f，防自匹配误报)",
+        "status": "running",
         "depends": []
       }
     }
