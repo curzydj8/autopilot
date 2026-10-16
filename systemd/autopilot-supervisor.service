@@ -1,0 +1,48 @@
+# autopilot-supervisor.service —— 自主运维总控（5 分钟一轮）
+#
+# 受限设计（在"能干活"和"关得住"之间取平衡）：
+# - 以普通用户 zhangdawei 运行，不以 root 运行
+# - ProtectSystem=true：/usr /boot /etc 只读，系统二进制不可篡改
+# - 内核相关全部锁死：ProtectKernelTunables / ProtectKernelModules /
+#   ProtectControlGroups / ProtectHostname / ProtectClock
+# - 资源上限：内存 1G、CPU 50%
+# - Restart=always：崩溃 30 秒后自动拉起
+#
+# 刻意没开的限制（功能需要，如实记录）：
+# - 未设 NoNewPrivileges / RestrictSUIDSGID：emergency.py 需要免密 sudo
+#   做 apt clean / journal vacuum / drop_caches
+# - 未用 ProtectSystem=strict：P0 磁盘紧急清理要写 /var/cache/apt、
+#   /var/log，strict 会把 /var 也只读导致清理静默失效
+# - 未用 PrivateTmp：磁盘告警时要清的是真实 /tmp，不是命名空间里的
+
+[Unit]
+Description=Autopilot Supervisor - autonomous ops brain (5min loop)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zhangdawei
+Group=zhangdawei
+WorkingDirectory=/home/zhangdawei/workspace/autopilot
+ExecStart=/usr/bin/python3 /home/zhangdawei/workspace/autopilot/supervisor.py
+Restart=always
+RestartSec=30
+
+# --- 沙箱限制 ---
+ProtectSystem=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+# --- 资源上限 ---
+MemoryMax=1G
+CPUQuota=50%
+
+# 日志走 journal：journalctl -u autopilot-supervisor -f
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
