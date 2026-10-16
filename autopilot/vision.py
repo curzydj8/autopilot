@@ -20,6 +20,27 @@ from recorder import record
 SCREENSHOT_DIR = os.path.expanduser("~/workspace/autopilot/screenshots")
 
 
+def _get_xauth():
+    """自动找 Xwayland 的认证文件"""
+    import glob
+    import subprocess
+    # 从 Xwayland 命令行找 -auth 参数
+    try:
+        out = subprocess.check_output(
+            "ps aux | grep Xwayland | grep -v grep | head -1",
+            shell=True, text=True, timeout=5)
+        import re
+        m = re.search(r"-auth\s+(\S+)", out)
+        if m and os.path.exists(m.group(1)):
+            return m.group(1)
+    except Exception:
+        pass
+    # 备选：找 /run/user/*/xauth_*
+    for p in glob.glob("/run/user/*/xauth_*"):
+        return p
+    return None
+
+
 def screenshot(path=None):
     """截屏，返回文件路径"""
     os.makedirs(SCREENSHOT_DIR, exist_ok=True)
@@ -35,9 +56,24 @@ def screenshot(path=None):
         return path
     except ImportError:
         pass
-    # 备选：gnome-screenshot / scrot / import
+
+    # Xwayland + scrot (自动找认证)
+    xauth = _get_xauth()
+    if xauth:
+        env = f"DISPLAY=:0 XAUTHORITY={xauth}"
+        cmd = f"{env} scrot {path} 2>/dev/null"
+        if os.system(cmd) == 0 and os.path.exists(path):
+            # 验证是有效图片
+            try:
+                from PIL import Image
+                img = Image.open(path)
+                if img.size[0] > 100:  # 不是空图
+                    return path
+            except Exception:
+                pass
+
+    # 备选：其他工具
     for cmd in [f"gnome-screenshot -f {path}",
-                f"scrot {path}",
                 f"import -window root {path}"]:
         if os.system(cmd + " 2>/dev/null") == 0 and os.path.exists(path):
             return path
