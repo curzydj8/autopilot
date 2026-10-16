@@ -27,6 +27,7 @@ import signal
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from procutil import find_script_pids, pid_matches_script
 
 MODULE_DIR = os.path.expanduser("~/workspace/autopilot")
 LOG_DIR = f"{MODULE_DIR}/logs"
@@ -51,6 +52,37 @@ MODULES = {
     },
 }
 
+# systemd 服务名映射（存在则优先用 systemctl 管理）
+SYSTEMD_UNITS = {
+    "supervisor": "autopilot-supervisor",
+    "emergency": "autopilot-emergency",
+}
+
+
+def _script_of(name):
+    """模块对应的脚本文件名，如 supervisor.py"""
+    return MODULES[name]["cmd"].split()[-1]
+
+
+def _has_unit(name):
+    """该模块是否有 systemd 单元（只在装了服务的那台机器上为真）"""
+    unit = SYSTEMD_UNITS.get(name)
+    if not unit:
+        return False
+    return os.path.exists(f"/etc/systemd/system/{unit}.service")
+
+
+def _systemctl(action, name):
+    """经 sudo 调 systemctl；返回是否成功"""
+    unit = SYSTEMD_UNITS[name]
+    try:
+        r = subprocess.run(
+            ["sudo", "systemctl", action, unit],
+            capture_output=True, text=True, timeout=30)
+        return r.returncode == 0
+    except Exception:
+        return False
+
 
 def _run(cmd, timeout=15):
     try:
@@ -62,20 +94,28 @@ def _run(cmd, timeout=15):
 
 
 def get_pid(name):
-    """取模块 PID"""
+    """取模块 PID（精确版）。
+
+    1. PID 文件存在 → 校验 /proc/<pid>/cmdline 真的是该模块
+       （防 PID 复用：老 PID 被别的进程占用时不再误报）。
+    2. 否则直接扫描 /proc，不经过 shell（杜绝 pgrep -f 把
+       执行它的 shell 自身匹配上的误报）。
+    """
+    script = _script_of(name)
     pid_file = f"{PID_DIR}/{name}.pid"
     if os.path.exists(pid_file):
         try:
             with open(pid_file) as f:
                 pid = int(f.read().strip())
-            # 验证进程还在
-            os.kill(pid, 0)
-            return pid
+            if pid_matches_script(pid, script):
+                return pid
         except Exception:
             pass
-    # 备选：pgrep
-    out = _run(f"pgrep -f '{MODULES[name]['cmd']}' | head -1")
-    return int(out) if out.isdigit() else None
+    pids = find_script_pids(script)
+    if pids:
+        save_pid(name, pids[0])
+        return pids[0]
+    return None
 
 
 def save_pid(name, pid):
@@ -85,13 +125,23 @@ def save_pid(name, pid):
 
 
 def start_module(name):
-    """启动单个模块"""
+    """启动单个模块（有 systemd 单元时走 systemctl）"""
     if name not in MODULES:
         print(f"❌ 未知模块: {name}")
         return False
     if get_pid(name):
         print(f"  {name} 已在运行")
         return True
+
+    if _has_unit(name):
+        if _systemctl("start", name):
+            time.sleep(3)
+            pid = get_pid(name)
+            if pid:
+                print(f"  ✅ {name} 已启动 (systemd, PID {pid})")
+                return True
+        print(f"  ❌ {name} 启动失败 (systemctl)")
+        return False
 
     mod = MODULES[name]
     log_file = f"{LOG_DIR}/{name}.log"
@@ -116,29 +166,70 @@ def start_module(name):
         return False
 
 
+def _kill_pid(pid):
+    """SIGTERM → 等 → SIGKILL → 还不死则 sudo kill -9（本机有免密 sudo）"""
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return True
+    except Exception:
+        return False
+    time.sleep(2)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    try:
+        os.kill(pid, signal.SIGKILL)
+    except Exception:
+        pass
+    time.sleep(1)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return True
+    # 最后手段：免密 sudo（曾遇到普通 kill 杀不掉、sudo kill -9 才死的 case）
+    try:
+        subprocess.run(["sudo", "kill", "-9", str(pid)],
+                       capture_output=True, timeout=10)
+    except Exception:
+        pass
+    time.sleep(1)
+    try:
+        os.kill(pid, 0)
+        return False
+    except ProcessLookupError:
+        return True
+
+
 def stop_module(name):
-    """停止单个模块"""
+    """停止单个模块（有 systemd 单元时走 systemctl，避免被 Restart 拉起）"""
+    if _has_unit(name):
+        _systemctl("stop", name)
+        # 迁移兜底：单元接管前可能有 nohup 遗留进程，systemctl 管不到，一并杀掉
+        leftover = get_pid(name)
+        if leftover:
+            _kill_pid(leftover)
+        pid_file = f"{PID_DIR}/{name}.pid"
+        if os.path.exists(pid_file):
+            os.remove(pid_file)
+        alive = get_pid(name)
+        print(f"  {'✅' if not alive else '❌'} {name} 已停止 (systemd)"
+              f"{'' if not alive else '，仍有残留进程!'}")
+        return not alive
+
     pid = get_pid(name)
     if not pid:
         print(f"  {name} 未运行")
         return True
-    try:
-        os.kill(pid, signal.SIGTERM)
-        time.sleep(2)
-        # 还在就 SIGKILL
-        try:
-            os.kill(pid, 0)
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+    if _kill_pid(pid):
         pid_file = f"{PID_DIR}/{name}.pid"
         if os.path.exists(pid_file):
             os.remove(pid_file)
         print(f"  ✅ {name} 已停止")
         return True
-    except Exception as e:
-        print(f"  ❌ 停止 {name} 失败: {e}")
-        return False
+    print(f"  ❌ 停止 {name} 失败")
+    return False
 
 
 def start_all():
@@ -164,8 +255,9 @@ def status():
     for name, mod in MODULES.items():
         pid = get_pid(name)
         icon = "🟢" if pid else "⚪"
+        via = " [systemd]" if _has_unit(name) else ""
         print(f"  {icon} {name:12} {mod['desc']:20} "
-              f"{'PID '+str(pid) if pid else '未运行'}")
+              f"{'PID '+str(pid) if pid else '未运行'}{via}")
 
     # 系统资源
     try:
